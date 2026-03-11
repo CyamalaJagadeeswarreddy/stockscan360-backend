@@ -2,21 +2,24 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs'); // Required for manual hashing
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 // --- IMPORT MODELS & MIDDLEWARE ---
-const Item = require('./models/Item');
+// FIXED: Make sure you have an Item.js file inside a 'models' folder
+const Item = require('./models/Item'); 
 const User = require('./models/User');
 const auth = require('./middleware/auth');
 
 const app = express();
 
 // --- MIDDLEWARE ---
+// FIXED: 'app' must be defined before we use it here
 app.use(cors()); 
 app.use(express.json()); 
 
 // --- DATABASE CONNECTION ---
+// Note: In a real production app, put this string in Render Environment Variables!
 mongoose.connect('mongodb+srv://jagadeeswarreddy:jagadees123@cluster0.jrwopzi.mongodb.net/stockscan360?appName=Cluster0')
     .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.error('❌ MongoDB Connection Error:', err));
@@ -32,13 +35,11 @@ app.post('/api/auth/register', async (req, res) => {
     const { name, phone, username, password } = req.body;
 
     try {
-        // Check if user exists
         const userExists = await User.findOne({ username });
         if (userExists) {
             return res.status(400).json({ message: 'Username already taken' });
         }
 
-        // Manual Hashing (Secure and avoids 'next' errors)
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -66,13 +67,11 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Check Password
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Generate Token
         const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
 
         res.json({ 
@@ -88,10 +87,9 @@ app.post('/api/auth/login', async (req, res) => {
 // INVENTORY ROUTES (Protected - Login Required)
 // ==========================================
 
-// 1. GET all items (Privacy: Only show items for logged in user)
+// 1. GET all items
 app.get('/api/inventory', auth, async (req, res) => {
     try {
-        // req.user.id comes from the decoded token
         const items = await Item.find({ userId: req.user.id });
         res.json(items);
     } catch (err) {
@@ -99,7 +97,7 @@ app.get('/api/inventory', auth, async (req, res) => {
     }
 });
 
-// 2. ADD a new item (Privacy: Attach userId to item)
+// 2. ADD a new item
 app.post('/api/inventory', auth, async (req, res) => {
     try {
         const item = new Item({
@@ -109,7 +107,7 @@ app.post('/api/inventory', auth, async (req, res) => {
             quantity: req.body.quantity,
             price: req.body.price,
             reorder: req.body.reorder,
-            userId: req.user.id // <--- CRITICAL: Link to User
+            userId: req.user.id 
         });
 
         const newItem = await item.save();
@@ -119,17 +117,15 @@ app.post('/api/inventory', auth, async (req, res) => {
     }
 });
 
-// 3. UPDATE an item (Privacy: Check ownership before update)
+// 3. UPDATE an item
 app.put('/api/inventory/:id', auth, async (req, res) => {
     try {
-        // Find item that matches BOTH ID and UserID
         const item = await Item.findOne({ _id: req.params.id, userId: req.user.id });
 
         if (!item) {
             return res.status(404).json({ message: 'Item not found or access denied' });
         }
 
-        // Update the item
         const updatedItem = await Item.findByIdAndUpdate(
             req.params.id, 
             req.body, 
@@ -142,25 +138,8 @@ app.put('/api/inventory/:id', auth, async (req, res) => {
     }
 });
 
-// 4. DELETE an item (Privacy: Check ownership before delete)
-app.delete('/api/inventory/:id', auth, async (req, res) => {
-    try {
-        // Find item that matches BOTH ID and UserID
-        const item = await Item.findOne({ _id: req.params.id, userId: req.user.id });
-        
-        if (!item) {
-            return res.status(404).json({ message: 'Item not found or access denied' });
-        }
-
-        await Item.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Item deleted' });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
 // --- START SERVER ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
