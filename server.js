@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 // --- IMPORT MODELS & MIDDLEWARE ---
-// FIXED: Make sure you have an Item.js file inside a 'models' folder
+// Make sure you have Item.js inside the 'models' folder
 const Item = require('./models/Item'); 
 const User = require('./models/User');
 const auth = require('./middleware/auth');
@@ -14,13 +14,12 @@ const auth = require('./middleware/auth');
 const app = express();
 
 // --- MIDDLEWARE ---
-// FIXED: 'app' must be defined before we use it here
 app.use(cors()); 
 app.use(express.json()); 
 
 // --- DATABASE CONNECTION ---
-// Note: In a real production app, put this string in Render Environment Variables!
-mongoose.connect('mongodb+srv://jagadeeswarreddy:jagadees123@cluster0.jrwopzi.mongodb.net/stockscan360?appName=Cluster0')
+// This now uses the MONGO_URI from your Render Environment Variables (Secure!)
+mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
@@ -135,6 +134,22 @@ app.put('/api/inventory/:id', auth, async (req, res) => {
         res.json(updatedItem);
     } catch (err) {
         res.status(400).json({ message: err.message });
+    }
+});
+
+// 4. DELETE an item (Added back so your Delete button works!)
+app.delete('/api/inventory/:id', auth, async (req, res) => {
+    try {
+        const item = await Item.findOne({ _id: req.params.id, userId: req.user.id });
+        
+        if (!item) {
+            return res.status(404).json({ message: 'Item not found or access denied' });
+        }
+
+        await Item.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Item deleted' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 });
 
